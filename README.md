@@ -32,7 +32,18 @@ $env:RA_DEVICE_ID = "pc-01"
 .\.venv\Scripts\python.exe agent.py
 ~~~
 
-**Linux / macOS:**
+**Linux / macOS (recommended Bash setup):**
+
+```bash
+git clone https://github.com/Cryosimorgh/Remote-Accessor-.git
+cd Remote-Accessor-
+bash setup.sh
+bash setup.sh run
+```
+
+`setup.sh` installs the dependencies, prompts for the broker details and device ID, and saves them to a local `.env` file (ignored by Git, with permissions `600`). It does not overwrite existing configuration. `bash setup.sh run` loads this file and starts the agent; `bash setup.sh test` runs the local tests. Press Ctrl+C to stop. The script is for Linux/macOS Bash (and WSL with Linux Python), not Windows PowerShell.
+
+**Linux / macOS (manual alternative):**
 
 ~~~sh
 python3 -m venv .venv
@@ -45,7 +56,7 @@ export RA_DEVICE_ID='pc-01'
 .venv/bin/python agent.py
 ~~~
 
-See `.env.example` for all settings. It is a **reference only**: there is no `.env` parser, so set variables in your shell or OS. `RA_MQTT_PORT` defaults to `8883`. Keep credentials out of source control. The agent verifies the broker's TLS certificate and hostname; it does not have an insecure-TLS switch. Stop with Ctrl+C.
+See `.env.example` for all settings. This example file is a **reference only**: the Python agent does not load it; either use the Bash helper, which loads its generated `.env`, or set environment variables in your shell or OS. `RA_MQTT_PORT` defaults to `8883`. Keep credentials out of source control. The agent verifies the broker's TLS certificate and hostname; it does not have an insecure-TLS switch. Stop with Ctrl+C.
 
 ## 3. Request CPU usage from the phone
 
