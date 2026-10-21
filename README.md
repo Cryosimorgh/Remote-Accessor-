@@ -23,13 +23,13 @@ Requires Python 3.9+.
 
 ~~~powershell
 py -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 $env:RA_MQTT_HOST = "your-broker.example.com"
 $env:RA_MQTT_PORT = "8883"
 $env:RA_MQTT_USERNAME = "your-agent-username"
 $env:RA_MQTT_PASSWORD = "your-agent-password"
 $env:RA_DEVICE_ID = "pc-01"
-.venv\Scripts\python agent.py
+.\.venv\Scripts\python.exe agent.py
 ~~~
 
 **Linux / macOS:**
@@ -66,8 +66,14 @@ The value and UTC timestamp above are illustrative. One message yields one CPU m
 
 ## 4. Local test (no broker needed)
 
+~~~powershell
+.\.venv\Scripts\python.exe -m unittest -v test_agent.py
+~~~
+
+Or on Linux/macOS:
+
 ~~~sh
-python -m unittest -v test_agent.py
+.venv/bin/python -m unittest -v test_agent.py
 ~~~
 
 Tests cover config validation, the CPU response, and rejection of retained, unknown, or wrong-topic commands. This is a local protocol/handler test, **not** a live end-to-end broker test; that still requires your real broker credentials and both clients.
