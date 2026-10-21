@@ -8,5 +8,9 @@ Write-Host 'Checking broker once before starting (no endless retry on invalid se
 & $Python (Join-Path $PSScriptRoot 'broker_check.py')
 if ($LASTEXITCODE -ne 0) { throw 'Cannot start: broker check failed. Fix settings with .\\configure.ps1.' }
 Write-Host 'Starting monitoring. Press Ctrl+C to stop.'
-& $Python (Join-Path $PSScriptRoot 'agent.py')
-if ($LASTEXITCODE -ne 0) { throw "Agent exited with code $LASTEXITCODE." }
+try {
+    & $Python (Join-Path $PSScriptRoot 'agent.py')
+    if ($LASTEXITCODE -ne 0) { throw "Agent exited with code $LASTEXITCODE." }
+} finally {
+    [Environment]::SetEnvironmentVariable('RA_MQTT_PASSWORD', $null, 'Process')
+}
