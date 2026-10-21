@@ -4,7 +4,7 @@ Ask a PC for its current CPU percentage from a phone through an **existing hoste
 
 ## Windows PowerShell — do this first
 
-First test CPU monitoring **without the internet or broker credentials**:
+First test CPU monitoring **without a broker or network connection during the test** (initial Python/package installation requires internet access):
 
 ~~~powershell
 git pull
