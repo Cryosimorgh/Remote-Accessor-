@@ -18,15 +18,23 @@ If script execution is blocked, run `Set-ExecutionPolicy -Scope Process Bypass` 
 
 ### Remote connection — only after offline test
 
-You must have a **real hosted MQTT broker account**. The broker is not your PC or an IP address you invent. In your broker provider's dashboard, find its **TLS hostname**, **TLS port**, and **username/password**. An example of the hostname *format* is `cluster-name.s1.eu.hivemq.cloud` (not a working address). Do **not** enter `2` or any placeholder. The usual TLS port is `8883`, but use the exact port supplied by your provider.
+**You need a hosted MQTT broker account; Remote Accessor cannot invent broker addresses or logins.** Choose an existing broker you already own, or use [EMQX Cloud Serverless](https://www.emqx.com/en/cloud/serverless-mqtt), which currently offers a no-credit-card free quota. Follow the [official serverless setup guide](https://docs.emqx.com/en/cloud/latest/create/serverless.html):
+
+1. Register/sign in; create a project, then **New Deployment → Serverless**.
+2. Keep **monthly Spend Limit = 0** (only the free quota can be used); deploy.
+3. Go to **Deployment Overview** and **copy the Address** (your hostname) and TLS port (typically **8883**).
+4. Go to **Access Control → Authentication → Add**, then create an MQTT username and password. They are not your EMQX website login.
+5. Pick a device ID yourself, such as `my-pc`. Nothing else must be configured on the PC until then.
+
+Do **not** enter `2` or any placeholder for the hostname. A syntactically valid port or username alone cannot prove a broker exists; the script must check the live service.
 
 ~~~powershell
-.\configure.ps1  # Enter actual broker details; overwrites prior config
+.\configure.ps1  # Guide + enter broker details; verify BEFORE saving
 .\check.ps1      # ONE check: DNS -> TCP/TLS -> MQTT auth -> subscription
 .\run.ps1        # Starts agent only when initial broker check succeeds
 ~~~
 
-The Windows configuration is stored in `.env.windows.json` (ignored by Git); the password is encrypted with Windows DPAPI for your Windows user. Previous incorrect settings? **Just run `.\configure.ps1` again.** There is no need to reinstall dependencies.
+The script **does not save** settings until DNS, authenticated TLS and MQTT request-topic subscription checks succeed. It refuses malformed hostnames up front, and offers an exit without configuration if you have no broker yet. A provider outage or ACL rejection also prevents saving; it will not prove publish or phone access. A successful check replaces any earlier bad `.env.windows.json` file (ignored by Git); its MQTT password is encrypted with Windows DPAPI for your Windows user. There is no need to reinstall dependencies.
 
 | Diagnostic | What to check |
 | --- | --- |
