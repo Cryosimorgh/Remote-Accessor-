@@ -10,14 +10,27 @@ import agent
 class AgentTests(unittest.TestCase):
     def test_config(self):
         env = {
-            "RA_MQTT_HOST": "broker.example.net",
+            "RA_MQTT_HOST": "broker.test",
             "RA_MQTT_PORT": "8883",
             "RA_MQTT_USERNAME": "agent",
             "RA_MQTT_PASSWORD": "test-secret",
             "RA_DEVICE_ID": "my_pc-1",
         }
         with patch.dict(os.environ, env, clear=True):
-            self.assertEqual(agent.load_config(), ("broker.example.net", 8883, "agent", "test-secret", "my_pc-1"))
+            self.assertEqual(agent.load_config(), ("broker.test", 8883, "agent", "test-secret", "my_pc-1"))
+
+    def test_numeric_or_placeholder_broker_host_rejected(self):
+        for bad_host in ("2", "mqtts://broker.test", "your-broker.example.com"):
+            with self.subTest(host=bad_host):
+                env = {
+                    "RA_MQTT_HOST": bad_host,
+                    "RA_MQTT_USERNAME": "u",
+                    "RA_MQTT_PASSWORD": "p",
+                    "RA_DEVICE_ID": "pc-01",
+                }
+                with patch.dict(os.environ, env, clear=True):
+                    with self.assertRaises(ValueError):
+                        agent.load_config()
 
     def test_invalid_device_id_cannot_inject_topic(self):
         with patch.dict(os.environ, {"RA_MQTT_HOST": "broker", "RA_MQTT_USERNAME": "u", "RA_MQTT_PASSWORD": "p", "RA_DEVICE_ID": "pc/+/x"}, clear=True):
@@ -40,7 +53,7 @@ class AgentTests(unittest.TestCase):
 
     def test_main_uses_tls_and_reconnects(self):
         env = {
-            "RA_MQTT_HOST": "broker.example.net",
+            "RA_MQTT_HOST": "broker.test",
             "RA_MQTT_USERNAME": "agent",
             "RA_MQTT_PASSWORD": "test-secret",
             "RA_DEVICE_ID": "pc-01",
@@ -55,7 +68,7 @@ class AgentTests(unittest.TestCase):
         client.subscribe.assert_called_once_with("ra/pc-01/request", qos=0)
         client.tls_set_context.assert_called_once_with(ctx.return_value)
         client.reconnect_delay_set.assert_called_once_with(min_delay=1, max_delay=60)
-        client.connect_async.assert_called_once_with("broker.example.net", 8883, keepalive=60)
+        client.connect_async.assert_called_once_with("broker.test", 8883, keepalive=60)
         client.loop_forever.assert_called_once_with(retry_first_connection=True)
         client.disconnect.assert_called_once()
 
