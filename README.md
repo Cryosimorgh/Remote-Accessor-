@@ -19,7 +19,17 @@ Do not grant wildcard topic access unless needed. Use non-retained messages for 
 
 Requires Python 3.9+.
 
-**Windows PowerShell:**
+**Windows PowerShell (recommended):**
+
+~~~powershell
+git pull
+.\setup.ps1
+.\setup.ps1 run
+~~~
+
+On first setup, the helper creates a Windows Python virtual environment, installs dependencies, prompts for your TLS broker settings, and saves a local `.env.windows.json`. The MQTT password is encrypted with Windows DPAPI for your current account; the file is ignored by Git. `.\setup.ps1 run` starts the PC agent, and `.\setup.ps1 test` runs local tests. To reconfigure, delete `.env.windows.json` and run setup again. If script execution is blocked by the local policy, use `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1` for this one invocation. Requires Python 3.9+.
+
+**Windows PowerShell (manual alternative):**
 
 ~~~powershell
 py -m venv .venv
