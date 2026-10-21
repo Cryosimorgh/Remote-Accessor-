@@ -1,5 +1,6 @@
 """Remote Accessor Phase 1: respond to MQTT CPU usage requests."""
 
+import ipaddress
 import json
 import os
 import re
@@ -20,6 +21,17 @@ def load_config():
 
     if not host or not username or not password:
         raise ValueError("RA_MQTT_HOST, RA_MQTT_USERNAME and RA_MQTT_PASSWORD are required")
+    if host.isdecimal() or "://" in host or "/" in host or any(c.isspace() for c in host):
+        raise ValueError("RA_MQTT_HOST must be a real broker hostname or IP, not a number/URL. Run .\\configure.ps1")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        labels = host.split(".")
+        if (len(host) > 253 or
+            not all(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) for label in labels) or
+            host.lower().endswith((".example.com", ".example.net", ".example.org")) or
+            host.lower().startswith("your-")):
+            raise ValueError("RA_MQTT_HOST is not a usable broker hostname. Copy it from your broker dashboard")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", device_id):
         raise ValueError("RA_DEVICE_ID must be 1-64 letters, digits, hyphens or underscores")
     try:
