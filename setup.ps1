@@ -1,5 +1,6 @@
 # Phase 1: install dependencies only. No broker credentials or network connection.
 $ErrorActionPreference = 'Stop'
+if ($args.Count -gt 0) { throw 'setup.ps1 only installs dependencies. Use .\test.ps1, .\configure.ps1, .\check.ps1, or .\run.ps1.' }
 $Root = $PSScriptRoot
 $Python = Join-Path $Root '.venv\Scripts\python.exe'
 
