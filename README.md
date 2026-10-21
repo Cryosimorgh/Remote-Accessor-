@@ -1,109 +1,71 @@
 # Remote Accessor — Phase 1
 
-Read a PC's CPU usage from a phone through an **existing MQTT broker**. Both devices connect outbound to the broker; no static IP, custom server, port forwarding, or phone app development is needed.
+Ask a PC for its current CPU percentage from a phone through an **existing hosted MQTT broker**. No static IP, port forwarding, custom server, or mobile app.
 
-## 1. Prepare the broker
+## Windows PowerShell — do this first
 
-Use an existing MQTT broker with **TLS on port 8883** (or its TLS port), a certificate trusted by your PC, and username/password authentication. Create a unique device ID, e.g. `pc-01`. Use separate broker credentials for the PC agent and phone if the broker supports them.
-
-Restrict broker-side topic ACLs (syntax varies by provider):
-
-| Client | May subscribe (read) | May publish (write) |
-| --- | --- | --- |
-| PC agent | `ra/pc-01/request` | `ra/pc-01/response` |
-| Phone | `ra/pc-01/response` | `ra/pc-01/request` |
-
-Do not grant wildcard topic access unless needed. Use non-retained messages for requests. This demo uses QoS 0 and a clean session, so offline commands are dropped rather than replayed. The agent additionally ignores any request delivered with the MQTT retained flag set.
-
-## 2. Install on the PC
-
-Requires Python 3.9+.
-
-**Windows PowerShell (recommended):**
+First test CPU monitoring **without the internet or broker credentials**:
 
 ~~~powershell
 git pull
-.\setup.ps1
-.\setup.ps1 run
+.\setup.ps1      # Installs Python dependencies ONLY
+.\test.ps1       # OFFLINE tests + actual CPU reading
 ~~~
 
-On first setup, the helper creates a Windows Python virtual environment, installs dependencies, prompts for your TLS broker settings, and saves a local `.env.windows.json`. The MQTT password is encrypted with Windows DPAPI for your current account; the file is ignored by Git. `.\setup.ps1 run` starts the PC agent, and `.\setup.ps1 test` runs local tests. To reconfigure, delete `.env.windows.json` and run setup again. If script execution is blocked by the local policy, use `powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1` for this one invocation. Requires Python 3.9+.
+Successful output includes `"cpu_percent"` and `"timestamp"` and then `Local test passed`. This does **not** test remote access.
 
-**Windows PowerShell (manual alternative):**
+If script execution is blocked, run `Set-ExecutionPolicy -Scope Process Bypass` in that PowerShell session, then retry.
+
+### Remote connection — only after offline test
+
+You must have a **real hosted MQTT broker account**. The broker is not your PC or an IP address you invent. In your broker provider's dashboard, find its **TLS hostname**, **TLS port**, and **username/password**. An example of the hostname *format* is `cluster-name.s1.eu.hivemq.cloud` (not a working address). Do **not** enter `2` or any placeholder. The usual TLS port is `8883`, but use the exact port supplied by your provider.
 
 ~~~powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-$env:RA_MQTT_HOST = "your-broker.example.com"
-$env:RA_MQTT_PORT = "8883"
-$env:RA_MQTT_USERNAME = "your-agent-username"
-$env:RA_MQTT_PASSWORD = "your-agent-password"
-$env:RA_DEVICE_ID = "pc-01"
-.\.venv\Scripts\python.exe agent.py
+.\configure.ps1  # Enter actual broker details; overwrites prior config
+.\check.ps1      # ONE check: DNS -> TCP/TLS -> MQTT auth -> subscription
+.\run.ps1        # Starts agent only when initial broker check succeeds
 ~~~
 
-**Linux / macOS (recommended Bash setup):**
+The Windows configuration is stored in `.env.windows.json` (ignored by Git); the password is encrypted with Windows DPAPI for your Windows user. Previous incorrect settings? **Just run `.\configure.ps1` again.** There is no need to reinstall dependencies.
 
-```bash
-git clone https://github.com/Cryosimorgh/Remote-Accessor-.git
-cd Remote-Accessor-
-bash setup.sh
-bash setup.sh run
-```
+| Diagnostic | What to check |
+| --- | --- |
+| `CONFIG ERROR` | Reconfigure using real broker details |
+| `DNS FAILED` | Broker hostname from dashboard |
+| `TCP/TLS FAILED` | Broker TLS port, firewall, certificate |
+| `MQTT LOGIN REJECTED` | Broker username/password |
+| `TOPIC ACCESS DENIED` | Broker topic ACLs |
+| `BROKER CHECK PASSED` | PC can connect and subscribe; launch agent |
 
-`setup.sh` installs the dependencies, prompts for the broker details and device ID, and saves them to a local `.env` file (ignored by Git, with permissions `600`). It does not overwrite existing configuration. `bash setup.sh run` loads this file and starts the agent; `bash setup.sh test` runs the local tests. Press Ctrl+C to stop. The script is for Linux/macOS Bash (and WSL with Linux Python), not Windows PowerShell.
+The broker check verifies connection and subscription, **not** publish permissions or a full phone-to-PC round trip. Agent retries automatically after later network interruptions.
 
-**Linux / macOS (manual alternative):**
+## Real phone test
 
-~~~sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-export RA_MQTT_HOST='your-broker.example.com'
-export RA_MQTT_PORT=8883
-export RA_MQTT_USERNAME='your-agent-username'
-export RA_MQTT_PASSWORD='your-agent-password'
-export RA_DEVICE_ID='pc-01'
-.venv/bin/python agent.py
-~~~
+When the PC says `Connected; listening on ra/pc-01/request`, use an existing MQTT client on your phone with TLS enabled, connected to the **same broker**. Use your phone's own broker credentials if possible.
 
-See `.env.example` for all settings. This example file is a **reference only**: the Python agent does not load it; either use the Bash helper, which loads its generated `.env`, or set environment variables in your shell or OS. `RA_MQTT_PORT` defaults to `8883`. Keep credentials out of source control. The agent verifies the broker's TLS certificate and hostname; it does not have an insecure-TLS switch. Stop with Ctrl+C.
-
-## 3. Request CPU usage from the phone
-
-In any existing phone MQTT client that supports TLS and username/password authentication:
-
-1. Connect to the **same broker** using the broker hostname, TLS port, and your phone client's credentials. Enable TLS certificate verification.
-2. **Subscribe** to `ra/pc-01/response` (replace `pc-01` with your device ID).
-3. **Publish** the exact UTF-8 text `get_cpu` to `ra/pc-01/request`, **QoS 0**, **retain OFF**.
-4. Read the response on `ra/pc-01/response`:
+1. Subscribe to `ra/<device_id>/response` **first**.
+2. Publish exact UTF-8 text `get_cpu` on `ra/<device_id>/request`, QoS 0, retained **OFF**.
+3. Read a response like this (example values):
 
 ~~~json
 {"device_id":"pc-01","cpu_percent":12.5,"timestamp":"2026-10-21T10:30:00Z"}
 ~~~
 
-The value and UTC timestamp above are illustrative. One message yields one CPU measurement (0.1-second sampling interval); there is no polling until you request it again. To test reconnection, briefly disconnect/reconnect the PC's network, then issue a **new** request.
+Replace `<device_id>` with the exact ID entered during configuration. Each request triggers a 0.1-second CPU sample. Stop the PC agent with Ctrl+C.
 
-**If no reply:** Check agent's `Connected` output; compare device ID, broker/port, and topic spelling; check both clients' ACLs; ensure the phone subscribes *before* publishing; and ensure `retain` is off. When the agent is disconnected, requests are intentionally not queued.
+### Broker ACLs
 
-## 4. Local test (no broker needed)
+| Client | May subscribe | May publish |
+| --- | --- | --- |
+| PC agent | `ra/pc-01/request` | `ra/pc-01/response` |
+| Phone | `ra/pc-01/response` | `ra/pc-01/request` |
 
-~~~powershell
-.\.venv\Scripts\python.exe -m unittest -v test_agent.py
-~~~
+Substitute your device ID. Use broker authentication and verified TLS. Do not retain command messages. The agent rejects retained requests and ignores anything other than `get_cpu`.
 
-Or on Linux/macOS:
+## Linux/macOS (Bash)
 
-~~~sh
-.venv/bin/python -m unittest -v test_agent.py
-~~~
+Existing Bash helper: `bash setup.sh` installs and configures, `bash setup.sh test` runs tests, `bash setup.sh run` starts the agent. This older Linux/macOS helper still combines setup and broker configuration; the **native Windows commands above are separated**.
 
-Tests cover config validation, the CPU response, and rejection of retained, unknown, or wrong-topic commands. This is a local protocol/handler test, **not** a live end-to-end broker test; that still requires your real broker credentials and both clients.
+## Resource estimates
 
-## Resource profile
-
-- **Idle CPU:** estimated below 0.1% on a normal PC (no continuous sampling; MQTT socket loop waits for traffic).
-- **RAM:** estimated 15–35 MiB for the Python agent process, depending on OS and Python build.
-- **Network:** MQTT keepalive is 60 seconds (one PINGREQ and PINGRESP = **4 MQTT bytes per minute** while idle, plus TCP/TLS/IP overhead). Startup TLS handshake typically adds a few KB. Each CPU request/response exchange is roughly **100–200 MQTT bytes** for a short device ID, plus transport overhead; it happens only on request.
-- **Latency:** each measurement waits ~100 ms for CPU sampling, plus broker and network latency.
-
-These are estimates, not readings from your PC or broker. `paho-mqtt` manages reconnection with exponential backoff from 1 to 60 seconds. No daemon, database, telemetry timer, HTTP endpoint, or arbitrary command execution is present.
+Python 3.9+; dependencies: `paho-mqtt`, `psutil`. Expected approximately **15–35 MiB RAM**, **below 0.1% idle CPU**, MQTT PINGREQ/PINGRESP ~**4 bytes/minute** plus TCP/IP/TLS overhead, and **100–200 MQTT bytes** per request/response plus overhead. These are estimates, not measurements of your machine or broker. No background polling, database, GUI, arbitrary commands, or ESP8266 support.
